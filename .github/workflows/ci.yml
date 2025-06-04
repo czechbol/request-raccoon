@@ -73,7 +73,7 @@ jobs:
         uses: codecov/codecov-action@v5
         if: matrix.os == 'ubuntu-latest'
         with:
-          file: ./coverage.out
+          files: ./coverage.out
           flags: unittests
           name: codecov-umbrella
         env:

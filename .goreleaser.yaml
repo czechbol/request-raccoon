@@ -57,10 +57,10 @@ builds:
 
 archives:
   - id: default
-    format: tar.gz
+    formats: [tar.gz]
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
     name_template: >-
       {{ .ProjectName }}_ {{- title .Os }}_ {{- if eq .Arch "amd64" }}x86_64 {{-
       else if eq .Arch "386" }}i386 {{- else }}{{ .Arch }}{{ end }} {{- if .Arm
@@ -85,7 +85,7 @@ dockers:
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-amd64"
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-amd64"
       - "ghcr.io/czechbol/request-raccoon:latest-amd64"
-    dockerfile: Dockerfile.goreleaser
+    dockerfile: Dockerfile
     use: buildx
     build_flag_templates:
       - "--pull"
@@ -102,7 +102,7 @@ dockers:
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-arm64v8"
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-arm64v8"
       - "ghcr.io/czechbol/request-raccoon:latest-arm64v8"
-    dockerfile: Dockerfile.goreleaser
+    dockerfile: Dockerfile
     use: buildx
     build_flag_templates:
       - "--pull"
@@ -119,7 +119,7 @@ dockers:
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-armv7"
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-armv7"
       - "ghcr.io/czechbol/request-raccoon:latest-armv7"
-    dockerfile: Dockerfile.goreleaser
+    dockerfile: Dockerfile
     use: buildx
     build_flag_templates:
       - "--pull"
@@ -137,7 +137,7 @@ dockers:
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-armv6"
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-armv6"
       - "ghcr.io/czechbol/request-raccoon:latest-armv6"
-    dockerfile: Dockerfile.goreleaser
+    dockerfile: Dockerfile
     use: buildx
     build_flag_templates:
       - "--pull"
