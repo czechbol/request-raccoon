@@ -1,0 +1,221 @@
+# GoReleaser configuration for request-raccoon
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - id: request-raccoon
+    main: ./cmd/http-logger
+    binary: request-raccoon
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - arm
+      - 386
+      - ppc64le
+      - s390x
+      - riscv64
+    goarm:
+      - "6"
+      - "7"
+    ignore:
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
+      - goos: windows
+        goarch: ppc64le
+      - goos: windows
+        goarch: s390x
+      - goos: windows
+        goarch: riscv64
+      - goos: darwin
+        goarch: 386
+      - goos: darwin
+        goarch: arm
+      - goos: darwin
+        goarch: ppc64le
+      - goos: darwin
+        goarch: s390x
+      - goos: darwin
+        goarch: riscv64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+      - -X main.builtBy=goreleaser
+
+archives:
+  - id: default
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: >-
+      {{ .ProjectName }}_ {{- title .Os }}_ {{- if eq .Arch "amd64" }}x86_64 {{-
+      else if eq .Arch "386" }}i386 {{- else }}{{ .Arch }}{{ end }} {{- if .Arm
+      }}v{{ .Arm }}{{ end }}
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  disable: true
+
+dockers:
+  - image_templates:
+      - "ghcr.io/czechbol/request-raccoon:{{ .Tag }}-amd64"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-amd64"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-amd64"
+      - "ghcr.io/czechbol/request-raccoon:latest-amd64"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--platform=linux/amd64"
+    goarch: amd64
+
+  - image_templates:
+      - "ghcr.io/czechbol/request-raccoon:{{ .Tag }}-arm64v8"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-arm64v8"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-arm64v8"
+      - "ghcr.io/czechbol/request-raccoon:latest-arm64v8"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--platform=linux/arm64/v8"
+    goarch: arm64
+
+  - image_templates:
+      - "ghcr.io/czechbol/request-raccoon:{{ .Tag }}-armv7"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-armv7"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-armv7"
+      - "ghcr.io/czechbol/request-raccoon:latest-armv7"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--platform=linux/arm/v7"
+    goarch: arm
+    goarm: "7"
+
+  - image_templates:
+      - "ghcr.io/czechbol/request-raccoon:{{ .Tag }}-armv6"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-armv6"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-armv6"
+      - "ghcr.io/czechbol/request-raccoon:latest-armv6"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--platform=linux/arm/v6"
+    goarch: arm
+    goarm: "6"
+
+docker_manifests:
+  - name_template: "ghcr.io/czechbol/request-raccoon:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/czechbol/request-raccoon:{{ .Tag }}-amd64"
+      - "ghcr.io/czechbol/request-raccoon:{{ .Tag }}-arm64v8"
+      - "ghcr.io/czechbol/request-raccoon:{{ .Tag }}-armv7"
+      - "ghcr.io/czechbol/request-raccoon:{{ .Tag }}-armv6"
+
+  - name_template: "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}"
+    image_templates:
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-amd64"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-arm64v8"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-armv7"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-armv6"
+
+  - name_template: "ghcr.io/czechbol/request-raccoon:v{{ .Major }}"
+    image_templates:
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-amd64"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-arm64v8"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-armv7"
+      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-armv6"
+
+  - name_template: "ghcr.io/czechbol/request-raccoon:latest"
+    image_templates:
+      - "ghcr.io/czechbol/request-raccoon:latest-amd64"
+      - "ghcr.io/czechbol/request-raccoon:latest-arm64v8"
+      - "ghcr.io/czechbol/request-raccoon:latest-armv7"
+      - "ghcr.io/czechbol/request-raccoon:latest-armv6"
+
+release:
+  github:
+    owner: czechbol
+    name: request-raccoon
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## Release {{ .Tag }} ({{ .Date }})
+
+    See [CHANGELOG.md](https://github.com/czechbol/request-raccoon/blob/{{ .Tag }}/CHANGELOG.md) for detailed release notes.
+  footer: |
+    ## Docker Images
+
+    Multi-architecture Docker images are available:
+
+    ```bash
+    docker pull ghcr.io/czechbol/request-raccoon:{{ .Tag }}
+    docker pull ghcr.io/czechbol/request-raccoon:latest
+    ```
+
+    ## Installation
+
+    ### Binary Downloads
+    Download the appropriate binary for your platform from the assets below.
+
+    ### Docker
+    ```bash
+    docker run --rm -p 8080:8080 ghcr.io/czechbol/request-raccoon:{{ .Tag }}
+    ```
+
+    ### Go Install
+    ```bash
+    go install github.com/czechbol/request-raccoon/cmd/http-logger@{{ .Tag }}
+    ```
+
+    **Full Changelog**: https://github.com/czechbol/request-raccoon/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+  extra_files:
+    - glob: ./dist/checksums.txt
