@@ -77,7 +77,7 @@ Send requests to any path (except `/health`) 🎯
 
 ```bash
 # Test webhook
-curl -X POST http://localhost:8080/webhook \
+curl http://localhost:8080/webhook \
   -H "Content-Type: application/json" \
   -d '{"event": "test"}'
 
