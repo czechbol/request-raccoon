@@ -216,6 +216,3 @@ release:
     ```
 
     **Full Changelog**: https://github.com/czechbol/request-raccoon/compare/{{ .PreviousTag }}...{{ .Tag }}
-
-  extra_files:
-    - glob: ./dist/checksums.txt
