@@ -63,13 +63,48 @@ go build -o request-raccoon cmd/http-logger/main.go
 
 ## ⚙️ Configuration
 
-| Variable              | Default   | Description                          |
-| --------------------- | --------- | ------------------------------------ |
-| `PORT`                | `8080`    | Server port                          |
-| `HOST`                | `0.0.0.0` | Server host                          |
-| `LOG_LEVEL`           | `info`    | Log level (debug, info, warn, error) |
-| `LOG_FORMAT`          | `text`    | Log format (text or json)            |
-| `ENABLE_REQUEST_BODY` | `true`    | Log request bodies                   |
+| Variable              | Default    | Description                                                   |
+| --------------------- | ---------- | ------------------------------------------------------------- |
+| `PORT`                | `8080`     | Server port                                                   |
+| `HOST`                | `0.0.0.0`  | Server host                                                   |
+| `LOG_LEVEL`           | `info`     | Log level (debug, info, warn, error)                          |
+| `LOG_FORMAT`          | `text`     | Log format (text or json)                                     |
+| `ENABLE_REQUEST_BODY` | `true`     | Log request bodies                                            |
+| `MAX_LOGGED_BODY`     | `65536`    | Maximum request body bytes to log (capped at `10485760`)      |
+| `MAX_REQUEST_BODY`    | `33554432` | Maximum accepted request body size in bytes (`0` = no limit)  |
+| `READ_TIMEOUT`        | `60s`      | Time allowed to read a request, as a Go duration (`0` = none) |
+
+Request bodies larger than `MAX_LOGGED_BODY` are logged truncated (without splitting a UTF-8 character), with
+`request_body_truncated=true` and, when the `Content-Length` is known, `request_body_size`. With `0`, every non-empty
+body is logged as empty and marked as truncated. Negative or non-numeric values use the default, and values above
+10 MiB are lowered to 10 MiB.
+
+### Request limits
+
+Both limits are enabled by default and apply to every path, including `/health`.
+
+- A body larger than `MAX_REQUEST_BODY` (32 MiB by default) is rejected with `413 Request Entity Too Large`, with or
+  without a `Content-Length`. The rejection happens once more bytes than the limit have been received.
+- A body that is still being read when `READ_TIMEOUT` expires is rejected with `408 Request Timeout`. The time is
+  counted for the whole request, headers included (headers must also arrive within 10 seconds). It is also how long an
+  idle keep-alive connection stays open.
+
+For both variables, negative or unparsable values use the default. `READ_TIMEOUT` needs a unit, such as `90s` or `5m`.
+
+The router redirects unclean paths, such as `//webhook`, without reading the rest of the body, so such a request can
+receive the redirect instead of `413` or `408`.
+
+### Unreadable request bodies
+
+Rejected requests are logged like any other. How a read failure is reported and answered depends on when it happens:
+
+| Failure happens                           | Log output                                     | Too large | Too slow | Any other failure |
+| ----------------------------------------- | ---------------------------------------------- | --------- | -------- | ----------------- |
+| While the logged part of the body is read | `request_body_error` field in the request line | `413`     | `408`    | `400`             |
+| After the request line has been logged    | Separate `Failed to read request body` warning | `413`     | `408`    | `200`             |
+
+The logged part is the first `MAX_LOGGED_BODY` bytes plus one. When reading it fails, `request_body` holds what was
+received, if anything. With `ENABLE_REQUEST_BODY=false`, every failure happens after the request line.
 
 ## 💡 Usage
 
@@ -87,7 +122,7 @@ curl "http://localhost:8080/api/users?page=1&limit=10"
 
 ## 🛣️ Endpoints
 
-- `GET /health` - 💚 Health check (not logged)
+- `GET /health` - 💚 Health check
 - `ANY /*` - 🎯 Universal handler (logs all requests)
 
 ## 📋 Log Output

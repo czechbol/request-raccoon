@@ -51,7 +51,7 @@ func TestHandler_Universal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req := httptest.NewRequestWithContext(t.Context(), tt.method, tt.path, nil)
 
 			rr := httptest.NewRecorder()
 			h.Universal(rr, req)
@@ -108,7 +108,7 @@ func TestHandler_Universal(t *testing.T) {
 
 func TestHandler_Universal_WithoutRequestID(t *testing.T) {
 	h := New()
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil)
 	rr := httptest.NewRecorder()
 
 	h.Universal(rr, req)
@@ -146,7 +146,7 @@ func TestHandler_Health(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, "/health", nil)
+			req := httptest.NewRequestWithContext(t.Context(), tt.method, "/health", nil)
 			rr := httptest.NewRecorder()
 
 			h.Health(rr, req)
@@ -190,7 +190,7 @@ func TestHandler_ResponseFormat(t *testing.T) {
 	h := New()
 
 	t.Run("Universal response has all required fields", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil)
 		rr := httptest.NewRecorder()
 
 		h.Universal(rr, req)
@@ -209,7 +209,7 @@ func TestHandler_ResponseFormat(t *testing.T) {
 	})
 
 	t.Run("Health response has all required fields", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/health", nil)
+		req := httptest.NewRequestWithContext(t.Context(), "GET", "/health", nil)
 		rr := httptest.NewRecorder()
 
 		h.Health(rr, req)
@@ -230,7 +230,7 @@ func TestHandler_ResponseFormat(t *testing.T) {
 
 func TestHandler_TimestampIsRecent(t *testing.T) {
 	h := New()
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil)
 	rr := httptest.NewRecorder()
 
 	before := time.Now().UTC()
@@ -257,7 +257,7 @@ func TestHandler_JSONEncoding(t *testing.T) {
 	h := New()
 
 	t.Run("valid JSON output", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil)
 		rr := httptest.NewRecorder()
 
 		h.Universal(rr, req)

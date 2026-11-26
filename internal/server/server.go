@@ -20,7 +20,7 @@ type Server struct {
 }
 
 // New creates a new server instance with configuration
-func New(cfg config.Config) *Server {
+func New(cfg *config.Config) *Server {
 	// Create middleware manager
 	middlewareManager := middleware.NewManager(cfg)
 
@@ -28,7 +28,7 @@ func New(cfg config.Config) *Server {
 	h := handler.New()
 
 	s := &Server{
-		config:     cfg,
+		config:     *cfg,
 		middleware: middlewareManager,
 		handler:    h,
 	}
@@ -49,11 +49,16 @@ func (s *Server) setupRoutes() {
 
 	// Apply middleware in the correct order
 	finalHandler := s.middleware.Logging(mux)
+	// MaxBytesHandler treats 0 as an empty body limit, not as no limit.
+	if s.config.MaxRequestBody > 0 {
+		finalHandler = http.MaxBytesHandler(finalHandler, s.config.MaxRequestBody)
+	}
 
 	s.server = &http.Server{
 		Addr:              s.config.Host + ":" + s.config.Port,
 		Handler:           finalHandler,
 		ReadHeaderTimeout: 10 * time.Second, // Set a read header timeout
+		ReadTimeout:       s.config.ReadTimeout,
 	}
 }
 

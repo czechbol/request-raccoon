@@ -1,11 +1,17 @@
 package middleware
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
+	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/czechbol/request-raccoon/internal/config"
 )
@@ -72,7 +78,7 @@ func TestManager_Logging(t *testing.T) {
 			cfg := config.Config{
 				EnableRequestBody: tt.enableRequestBody,
 			}
-			manager := NewManager(cfg)
+			manager := NewManager(&cfg)
 
 			// Create a test handler that records if it was called
 			var handlerCalled bool
@@ -100,7 +106,7 @@ func TestManager_Logging(t *testing.T) {
 				url += "?" + tt.query
 			}
 
-			req := httptest.NewRequest(tt.method, url, body)
+			req := httptest.NewRequestWithContext(t.Context(), tt.method, url, body)
 
 			// Add headers
 			for k, v := range tt.headers {
@@ -129,7 +135,7 @@ func TestManager_Logging_LargeBody(t *testing.T) {
 	cfg := config.Config{
 		EnableRequestBody: true,
 	}
-	manager := NewManager(cfg)
+	manager := NewManager(&cfg)
 
 	// Create a large body (over 1024 bytes)
 	largeBody := strings.Repeat("a", 1500)
@@ -147,7 +153,7 @@ func TestManager_Logging_LargeBody(t *testing.T) {
 	})
 
 	handler := manager.Logging(nextHandler)
-	req := httptest.NewRequest("POST", "/test", strings.NewReader(largeBody))
+	req := httptest.NewRequestWithContext(t.Context(), "POST", "/test", strings.NewReader(largeBody))
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -161,7 +167,7 @@ func TestManager_Logging_NilBody(t *testing.T) {
 	cfg := config.Config{
 		EnableRequestBody: true,
 	}
-	manager := NewManager(cfg)
+	manager := NewManager(&cfg)
 
 	var handlerCalled bool
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -170,7 +176,7 @@ func TestManager_Logging_NilBody(t *testing.T) {
 	})
 
 	handler := manager.Logging(nextHandler)
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -185,33 +191,62 @@ func TestManager_Logging_NilBody(t *testing.T) {
 }
 
 func TestManager_Logging_BodyReadError(t *testing.T) {
-	cfg := config.Config{
-		EnableRequestBody: true,
-	}
-	manager := NewManager(cfg)
-
-	var handlerCalled bool
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handlerCalled = true
-		w.WriteHeader(http.StatusOK)
-	})
-
-	handler := manager.Logging(nextHandler)
-
-	// Create a reader that always returns an error
-	errorReader := &errorReader{}
-	req := httptest.NewRequest("POST", "/test", errorReader)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	// Handler should not be called due to error
-	if handlerCalled {
-		t.Error("Next handler should not have been called due to body read error")
+	tests := []struct {
+		name     string
+		received string
+		// wantBody is nil when no request_body field is expected.
+		wantBody      any
+		wantTruncated any
+	}{
+		{name: "nothing received"},
+		{name: "partial body", received: "partial", wantBody: "partial"},
+		{name: "partial body at limit", received: "12345678", wantBody: "12345678"},
+		{
+			name: "partial body over limit", received: "123456789",
+			wantBody: "12345678", wantTruncated: true,
+		},
 	}
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("Expected status 500, got %d", rr.Code)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logs := captureLogs(t)
+			manager := NewManager(&config.Config{EnableRequestBody: true, MaxLoggedBody: 8})
+
+			handler := manager.Logging(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Error("Next handler should not have been called due to body read error")
+			}))
+
+			// DataErrReader reports the error together with the last bytes of data.
+			source := iotest.DataErrReader(io.MultiReader(strings.NewReader(tt.received), &errorReader{}))
+			req := httptest.NewRequestWithContext(t.Context(), "POST", "/test", source)
+			req.Header.Set("User-Agent", "test-agent")
+			req.Header.Set("Authorization", "Bearer secret")
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusBadRequest {
+				t.Errorf("Expected status 400, got %d", rr.Code)
+			}
+
+			entry := requestLogEntry(t, logs)
+			want := map[string]any{
+				"method":                 "POST",
+				"path":                   "/test",
+				"request_body":           tt.wantBody,
+				"request_body_truncated": tt.wantTruncated,
+				"request_body_error":     io.ErrUnexpectedEOF.Error(),
+			}
+			for field, value := range want {
+				if got := entry[field]; got != value {
+					t.Errorf("%s: expected %#v, got %#v", field, value, got)
+				}
+			}
+			wantHeaders := map[string]any{"User-Agent": "test-agent", "Authorization": "[REDACTED]"}
+			if got := entry["headers"]; !reflect.DeepEqual(got, wantHeaders) {
+				t.Errorf("headers: expected %#v, got %#v", wantHeaders, got)
+			}
+		})
 	}
 }
 
@@ -271,7 +306,7 @@ func TestManager_Logging_HeaderFiltering(t *testing.T) {
 	cfg := config.Config{
 		EnableRequestBody: false,
 	}
-	manager := NewManager(cfg)
+	manager := NewManager(&cfg)
 
 	var handlerCalled bool
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -280,7 +315,7 @@ func TestManager_Logging_HeaderFiltering(t *testing.T) {
 	})
 
 	handler := manager.Logging(nextHandler)
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil)
 
 	// Add both sensitive and non-sensitive headers
 	req.Header.Set("Authorization", "Bearer secret")
@@ -304,7 +339,7 @@ func TestManager_Logging_EmptyHeaders(t *testing.T) {
 	cfg := config.Config{
 		EnableRequestBody: false,
 	}
-	manager := NewManager(cfg)
+	manager := NewManager(&cfg)
 
 	var handlerCalled bool
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -313,7 +348,7 @@ func TestManager_Logging_EmptyHeaders(t *testing.T) {
 	})
 
 	handler := manager.Logging(nextHandler)
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil)
 	// Don't add any headers
 
 	rr := httptest.NewRecorder()
@@ -328,7 +363,195 @@ func TestManager_Logging_EmptyHeaders(t *testing.T) {
 	}
 }
 
+func TestManager_Logging_BodyLimit(t *testing.T) {
+	tests := []struct {
+		name    string
+		limit   int
+		body    string
+		chunked bool
+		// wantBody is nil when no request_body field is expected.
+		wantBody      any
+		wantTruncated bool
+		// wantSize is nil when no request_body_size field is expected.
+		wantSize any
+	}{
+		{name: "under limit", limit: 8, body: "abc", wantBody: "abc"},
+		{name: "exactly limit", limit: 8, body: "abcdefgh", wantBody: "abcdefgh"},
+		{
+			name: "limit plus one", limit: 8, body: "abcdefghi",
+			wantBody: "abcdefgh", wantTruncated: true, wantSize: float64(9),
+		},
+		{
+			name: "over 1024 bytes within limit", limit: 65536, body: strings.Repeat("a", 1500),
+			wantBody: strings.Repeat("a", 1500),
+		},
+		{name: "zero limit", limit: 0, body: "abc", wantBody: "", wantTruncated: true, wantSize: float64(3)},
+		{name: "zero limit without body", limit: 0, body: ""},
+		{name: "empty body", limit: 8, body: ""},
+		{
+			name: "two byte character split", limit: 4, body: "abcédef",
+			wantBody: "abc", wantTruncated: true, wantSize: float64(8),
+		},
+		{
+			name: "three byte character split after two bytes", limit: 5, body: "abc€def",
+			wantBody: "abc", wantTruncated: true, wantSize: float64(9),
+		},
+		{
+			name: "four byte character split after three bytes", limit: 6, body: "abc🦝def",
+			wantBody: "abc", wantTruncated: true, wantSize: float64(10),
+		},
+		{
+			name: "character ending at limit is kept", limit: 6, body: "abc€def",
+			wantBody: "abc€", wantTruncated: true, wantSize: float64(9),
+		},
+		{
+			name: "first character longer than limit", limit: 2, body: "🦝",
+			wantBody: "", wantTruncated: true, wantSize: float64(4),
+		},
+		{name: "multibyte body exactly limit", limit: 6, body: "abc€", wantBody: "abc€"},
+		{
+			// The JSON log handler renders the invalid byte as U+FFFD.
+			name: "invalid byte is not treated as a split character", limit: 3, body: "ab\xffcd",
+			wantBody: "ab�", wantTruncated: true, wantSize: float64(5),
+		},
+		{name: "chunked within limit", limit: 8, body: "abcdefgh", chunked: true, wantBody: "abcdefgh"},
+		{
+			name: "chunked over limit", limit: 8, body: "abcdefghijkl", chunked: true,
+			wantBody: "abcdefgh", wantTruncated: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logs := captureLogs(t)
+			manager := NewManager(&config.Config{EnableRequestBody: true, MaxLoggedBody: tt.limit})
+
+			var received []byte
+			handler := manager.Logging(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+				var err error
+				if received, err = io.ReadAll(r.Body); err != nil {
+					t.Errorf("Failed to read body in next handler: %v", err)
+				}
+			}))
+
+			req := httptest.NewRequestWithContext(t.Context(), "POST", "/test", strings.NewReader(tt.body))
+			if tt.chunked {
+				req.ContentLength = -1
+			}
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+
+			if string(received) != tt.body {
+				t.Errorf("Next handler: expected body %q, got %q", tt.body, received)
+			}
+
+			entry := requestLogEntry(t, logs)
+			if got := entry["request_body"]; got != tt.wantBody {
+				t.Errorf("request_body: expected %#v, got %#v", tt.wantBody, got)
+			}
+			var wantTruncated any
+			if tt.wantTruncated {
+				wantTruncated = true
+			}
+			if got := entry["request_body_truncated"]; got != wantTruncated {
+				t.Errorf("request_body_truncated: expected %#v, got %#v", wantTruncated, got)
+			}
+			if got := entry["request_body_size"]; got != tt.wantSize {
+				t.Errorf("request_body_size: expected %#v, got %#v", tt.wantSize, got)
+			}
+		})
+	}
+}
+
+func TestManager_Logging_BodyDisabled(t *testing.T) {
+	logs := captureLogs(t)
+	manager := NewManager(&config.Config{EnableRequestBody: false, MaxLoggedBody: 4})
+
+	source := &countingReader{reader: strings.NewReader("abcdefgh")}
+	handler := manager.Logging(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		if source.count != 0 {
+			t.Errorf("Expected body to be left unread, %d bytes were consumed", source.count)
+		}
+	}))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), "POST", "/test", source))
+
+	entry := requestLogEntry(t, logs)
+	for _, field := range []string{"request_body", "request_body_truncated", "request_body_size"} {
+		if value, ok := entry[field]; ok {
+			t.Errorf("Expected no %s field, got %#v", field, value)
+		}
+	}
+}
+
+func TestManager_Logging_BoundedBuffering(t *testing.T) {
+	const limit = 1000
+
+	logs := captureLogs(t)
+	manager := NewManager(&config.Config{EnableRequestBody: true, MaxLoggedBody: limit})
+	body := strings.Repeat("abcdefgh", 1<<17) // 1 MiB
+	source := &countingReader{reader: strings.NewReader(body)}
+
+	handler := manager.Logging(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		if source.count > limit+1 {
+			t.Errorf("Expected at most %d bytes buffered, got %d", limit+1, source.count)
+		}
+		if logs.Len() == 0 {
+			t.Error("Expected the request to be logged before the next handler runs")
+		}
+
+		received, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("Failed to read body in next handler: %v", err)
+		}
+		if string(received) != body {
+			t.Errorf("Next handler: expected %d bytes of body, got %d", len(body), len(received))
+		}
+	}))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), "POST", "/test", source))
+}
+
 // Helper types and functions for testing
+
+// captureLogs redirects the default logger to a buffer for the duration of the test.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+
+	previous, output, flags := slog.Default(), log.Writer(), log.Flags()
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+		// slog.SetDefault also redirects the log package, which restoring the default does not undo.
+		log.SetOutput(output)
+		log.SetFlags(flags)
+	})
+
+	buf := &bytes.Buffer{}
+	slog.SetDefault(slog.New(slog.NewJSONHandler(buf, nil)))
+	return buf
+}
+
+// requestLogEntry decodes the single log line written for a request.
+func requestLogEntry(t *testing.T, logs *bytes.Buffer) map[string]any {
+	t.Helper()
+
+	var entry map[string]any
+	if err := json.Unmarshal(logs.Bytes(), &entry); err != nil {
+		t.Fatalf("Expected exactly one JSON log line, got %q: %v", logs.String(), err)
+	}
+	if entry["msg"] != "HTTP request received" {
+		t.Fatalf("Unexpected log message: %v", entry["msg"])
+	}
+	return entry
+}
+
+type countingReader struct {
+	reader io.Reader
+	count  int
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.reader.Read(p)
+	c.count += n
+	return n, err
+}
 
 type errorReader struct{}
 
@@ -340,7 +563,7 @@ func TestManager_Logging_MultipleHeaderValues(t *testing.T) {
 	cfg := config.Config{
 		EnableRequestBody: false,
 	}
-	manager := NewManager(cfg)
+	manager := NewManager(&cfg)
 
 	var handlerCalled bool
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -349,7 +572,7 @@ func TestManager_Logging_MultipleHeaderValues(t *testing.T) {
 	})
 
 	handler := manager.Logging(nextHandler)
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil)
 
 	// Add header with multiple values
 	req.Header.Add("Accept", "application/json")

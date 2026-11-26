@@ -31,7 +31,7 @@ func main() {
 	slog.SetDefault(logger)
 
 	// Create server
-	srv := server.New(cfg)
+	srv := server.New(&cfg)
 
 	// Set up graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
