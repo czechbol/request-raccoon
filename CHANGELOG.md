@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `MAX_LOGGED_BODY` setting for the maximum number of request body bytes to log (default 65536, capped at 10 MiB)
+- `request_body_truncated` and `request_body_size` log fields for request bodies over the limit
+
+### Changed
+
+- Request bodies over the limit are logged truncated instead of being omitted, and the limit is raised from 1024 bytes to 65536 bytes by default
+
+### Fixed
+
+- Memory used for request body logging no longer grows with the size of the body
+
 ## [1.0.0] - 2025-06-05
 
 ### Added

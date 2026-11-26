@@ -63,13 +63,19 @@ go build -o request-raccoon cmd/http-logger/main.go
 
 ## ⚙️ Configuration
 
-| Variable              | Default   | Description                          |
-| --------------------- | --------- | ------------------------------------ |
-| `PORT`                | `8080`    | Server port                          |
-| `HOST`                | `0.0.0.0` | Server host                          |
-| `LOG_LEVEL`           | `info`    | Log level (debug, info, warn, error) |
-| `LOG_FORMAT`          | `text`    | Log format (text or json)            |
-| `ENABLE_REQUEST_BODY` | `true`    | Log request bodies                   |
+| Variable              | Default   | Description                                              |
+| --------------------- | --------- | -------------------------------------------------------- |
+| `PORT`                | `8080`    | Server port                                              |
+| `HOST`                | `0.0.0.0` | Server host                                              |
+| `LOG_LEVEL`           | `info`    | Log level (debug, info, warn, error)                     |
+| `LOG_FORMAT`          | `text`    | Log format (text or json)                                |
+| `ENABLE_REQUEST_BODY` | `true`    | Log request bodies                                       |
+| `MAX_LOGGED_BODY`     | `65536`   | Maximum request body bytes to log (capped at `10485760`) |
+
+Request bodies larger than `MAX_LOGGED_BODY` are logged truncated (without splitting a UTF-8 character), with
+`request_body_truncated=true` and, when the `Content-Length` is known, `request_body_size`. With `0`, every non-empty
+body is logged as empty and marked as truncated. Negative or non-numeric values use the default, and values above
+10 MiB are lowered to 10 MiB.
 
 ## 💡 Usage
 
