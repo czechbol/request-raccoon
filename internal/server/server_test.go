@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/czechbol/request-raccoon/internal/config"
@@ -412,6 +413,68 @@ func TestServer_LargeUpload(t *testing.T) {
 			}
 			if got := entry["request_body_size"]; got != tt.wantSize {
 				t.Errorf("request_body_size: expected %#v, got %#v", tt.wantSize, got)
+			}
+		})
+	}
+}
+
+func TestServer_BodyReadErrorAfterRequestLog(t *testing.T) {
+	tests := []struct {
+		name              string
+		path              string
+		enableRequestBody bool
+	}{
+		{name: "universal", path: "/upload", enableRequestBody: true},
+		{name: "universal with body logging disabled", path: "/upload"},
+		{name: "health check", path: "/health", enableRequestBody: true},
+		{name: "health check with body logging disabled", path: "/health"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			captureLogs(t, &logs)
+
+			app := New(config.Config{EnableRequestBody: tt.enableRequestBody, MaxLoggedBody: 4}).server.Handler
+
+			// The failure comes after more bytes than the middleware reads for the request log.
+			body := io.MultiReader(strings.NewReader("abcdefgh"), iotest.ErrReader(io.ErrUnexpectedEOF))
+			rr := httptest.NewRecorder()
+			app.ServeHTTP(rr, httptest.NewRequestWithContext(t.Context(), http.MethodPost, tt.path, body))
+
+			if rr.Code != http.StatusOK {
+				t.Errorf("Expected status %d, got %d", http.StatusOK, rr.Code)
+			}
+
+			var entries []map[string]any
+			for decoder := json.NewDecoder(&logs); decoder.More(); {
+				var entry map[string]any
+				if err := decoder.Decode(&entry); err != nil {
+					t.Fatalf("Failed to decode log line: %v", err)
+				}
+				entries = append(entries, entry)
+			}
+			if len(entries) != 2 {
+				t.Fatalf("Expected a request line and a warning, got %v", entries)
+			}
+
+			if got := entries[0]["msg"]; got != "HTTP request received" {
+				t.Errorf("Expected the request line first, got %v", got)
+			}
+			if got, ok := entries[0]["request_body_error"]; ok {
+				t.Errorf("Expected no request_body_error in the request line, got %v", got)
+			}
+
+			want := map[string]any{
+				"level": "WARN",
+				"msg":   "Failed to read request body",
+				"path":  tt.path,
+				"error": io.ErrUnexpectedEOF.Error(),
+			}
+			for field, value := range want {
+				if got := entries[1][field]; got != value {
+					t.Errorf("%s: expected %#v, got %#v", field, value, got)
+				}
 			}
 		})
 	}

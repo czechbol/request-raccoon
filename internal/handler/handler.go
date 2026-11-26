@@ -60,8 +60,11 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 // drainBody receives the whole request body. It has to happen before responding,
 // because net/http cuts off large unread uploads once the response is sent.
 func drainBody(r *http.Request) {
-	if r.Body != nil {
-		// Read failures do not change the response.
-		_, _ = io.Copy(io.Discard, r.Body)
+	if r.Body == nil {
+		return
+	}
+	// Read failures do not change the response.
+	if _, err := io.Copy(io.Discard, r.Body); err != nil {
+		slog.Warn("Failed to read request body", "path", r.URL.Path, "error", err)
 	}
 }

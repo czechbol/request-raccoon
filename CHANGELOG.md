@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `MAX_LOGGED_BODY` setting for the maximum number of request body bytes to log (default 65536, capped at 10 MiB)
 - `request_body_truncated` and `request_body_size` log fields for request bodies over the limit
+- Warning with the request path when reading the rest of a request body fails after the request has been logged
 
 ### Changed
 
