@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -17,6 +18,12 @@ func New() *Handler {
 
 // Universal responds with 200 OK to all requests.
 func (h *Handler) Universal(w http.ResponseWriter, r *http.Request) {
+	// Receive the whole body first: net/http cuts off large unread uploads once the response is sent.
+	if r.Body != nil {
+		// Read failures do not change the response.
+		_, _ = io.Copy(io.Discard, r.Body)
+	}
+
 	response := map[string]interface{}{
 		"status":    "success",
 		"message":   "Request logged successfully",

@@ -1,9 +1,15 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io"
+	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -309,6 +315,120 @@ func TestServer_HandlerChain(t *testing.T) {
 	if contentType != "application/json" {
 		t.Errorf("Expected Content-Type application/json, got %s", contentType)
 	}
+}
+
+func TestServer_LargeUpload(t *testing.T) {
+	const (
+		size  = 8 << 20
+		limit = 1024
+	)
+
+	tests := []struct {
+		name              string
+		enableRequestBody bool
+		chunked           bool
+		wantBody          any
+		wantTruncated     any
+		wantSize          any
+	}{
+		{
+			name:              "known length",
+			enableRequestBody: true,
+			wantBody:          strings.Repeat("a", limit),
+			wantTruncated:     true,
+			wantSize:          float64(size),
+		},
+		{
+			name:              "chunked",
+			enableRequestBody: true,
+			chunked:           true,
+			wantBody:          strings.Repeat("a", limit),
+			wantTruncated:     true,
+		},
+		{name: "body logging disabled"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			captureLogs(t, &logs)
+
+			app := New(config.Config{EnableRequestBody: tt.enableRequestBody, MaxLoggedBody: limit}).server.Handler
+
+			// Count what the application itself reads; net/http discards only a little after it returns.
+			received := make(chan int, 1)
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body := &countingBody{ReadCloser: r.Body}
+				r.Body = body
+				app.ServeHTTP(w, r)
+				received <- body.count
+			}))
+			defer ts.Close()
+
+			var upload io.Reader = strings.NewReader(strings.Repeat("a", size))
+			if tt.chunked {
+				// Hiding the concrete type leaves the length unknown to the client.
+				upload = io.MultiReader(upload)
+			}
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, ts.URL+"/upload", upload)
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+
+			resp, err := ts.Client().Do(req)
+			if err != nil {
+				t.Fatalf("Upload failed: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("Expected status %d, got %d", http.StatusOK, resp.StatusCode)
+			}
+			if got := <-received; got != size {
+				t.Errorf("Expected the server to receive %d bytes, got %d", size, got)
+			}
+
+			var entry map[string]any
+			if err := json.Unmarshal(logs.Bytes(), &entry); err != nil {
+				t.Fatalf("Expected exactly one JSON log line, got %d bytes: %v", logs.Len(), err)
+			}
+			if got := entry["request_body"]; got != tt.wantBody {
+				t.Errorf("request_body: expected %#v, got %#v", tt.wantBody, got)
+			}
+			if got := entry["request_body_truncated"]; got != tt.wantTruncated {
+				t.Errorf("request_body_truncated: expected %#v, got %#v", tt.wantTruncated, got)
+			}
+			if got := entry["request_body_size"]; got != tt.wantSize {
+				t.Errorf("request_body_size: expected %#v, got %#v", tt.wantSize, got)
+			}
+		})
+	}
+}
+
+// captureLogs redirects the default logger to w for the duration of the test.
+func captureLogs(t *testing.T, w io.Writer) {
+	t.Helper()
+
+	previous, output, flags := slog.Default(), log.Writer(), log.Flags()
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+		// slog.SetDefault also redirects the log package, which restoring the default does not undo.
+		log.SetOutput(output)
+		log.SetFlags(flags)
+	})
+
+	slog.SetDefault(slog.New(slog.NewJSONHandler(w, nil)))
+}
+
+type countingBody struct {
+	io.ReadCloser
+	count int
+}
+
+func (c *countingBody) Read(p []byte) (int, error) {
+	n, err := c.ReadCloser.Read(p)
+	c.count += n
+	return n, err
 }
 
 func TestServer_RouteSpecificity(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/czechbol/request-raccoon/internal/config"
 )
@@ -25,23 +26,6 @@ func NewManager(cfg config.Config) *Manager {
 // Logging logs all HTTP requests with comprehensive details
 func (m *Manager) Logging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Read and restore request body if enabled
-		var bodyContent string
-		if m.config.EnableRequestBody && r.Body != nil {
-			bodyBytes, err := io.ReadAll(r.Body)
-			if err != nil {
-				slog.Error("Failed to read request body",
-					"error", err)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-				return
-			}
-
-			bodyContent = string(bodyBytes)
-
-			// Restore the request body for downstream handlers
-			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-		}
-
 		// Prepare log entry
 		logFields := []any{
 			"method", r.Method,
@@ -50,9 +34,16 @@ func (m *Manager) Logging(next http.Handler) http.Handler {
 			"remote_addr", r.RemoteAddr,
 		}
 
-		// Add request body if enabled and not too large
-		if m.config.EnableRequestBody && bodyContent != "" && len(bodyContent) <= 1024 {
-			logFields = append(logFields, "request_body", bodyContent)
+		// Add request body if enabled
+		if m.config.EnableRequestBody && r.Body != nil {
+			bodyFields, err := m.peekBody(r)
+			if err != nil {
+				slog.Error("Failed to read request body",
+					"error", err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				return
+			}
+			logFields = append(logFields, bodyFields...)
 		}
 
 		// Add all headers (except sensitive ones)
@@ -76,7 +67,56 @@ func (m *Manager) Logging(next http.Handler) http.Handler {
 	})
 }
 
+// peekBody reads just enough of the request body to log it, restores the body
+// for downstream handlers and returns the log fields describing it.
+func (m *Manager) peekBody(r *http.Request) ([]any, error) {
+	limit := m.config.MaxLoggedBody
+
+	// The one byte past the limit tells whether the body has to be truncated.
+	prefix, err := io.ReadAll(io.LimitReader(r.Body, int64(limit)+1))
+	if err != nil {
+		return nil, err
+	}
+
+	r.Body = struct {
+		io.Reader
+		io.Closer
+	}{io.MultiReader(bytes.NewReader(prefix), r.Body), r.Body}
+
+	switch {
+	case len(prefix) == 0:
+		return nil, nil
+	case len(prefix) <= limit:
+		return []any{"request_body", string(prefix)}, nil
+	}
+
+	fields := []any{
+		"request_body", string(truncateUTF8(prefix, limit)),
+		"request_body_truncated", true,
+	}
+	// ContentLength is -1 when unknown, for example with chunked encoding.
+	if r.ContentLength > 0 {
+		fields = append(fields, "request_body_size", r.ContentLength)
+	}
+	return fields, nil
+}
+
 // Utility functions
+
+// truncateUTF8 returns at most limit bytes of b without splitting a UTF-8
+// character. b must be longer than limit.
+func truncateUTF8(b []byte, limit int) []byte {
+	// Only a character starting in the last utf8.UTFMax-1 bytes can cross the limit.
+	for i := limit - 1; i >= 0 && i > limit-utf8.UTFMax; i-- {
+		if utf8.RuneStart(b[i]) {
+			if !utf8.FullRune(b[i:limit]) {
+				return b[:i]
+			}
+			break
+		}
+	}
+	return b[:limit]
+}
 
 func isSensitiveHeader(key string) bool {
 	sensitive := []string{
