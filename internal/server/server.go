@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/czechbol/request-raccoon/internal/config"
+	"github.com/czechbol/request-raccoon/internal/endpoint"
 	"github.com/czechbol/request-raccoon/internal/handler"
 	"github.com/czechbol/request-raccoon/internal/middleware"
 )
@@ -16,11 +18,13 @@ type Server struct {
 	config     config.Config
 	middleware *middleware.Manager
 	handler    *handler.Handler
+	endpoints  []endpoint.Endpoint
 	server     *http.Server
 }
 
-// New creates a new server instance with configuration
-func New(cfg *config.Config) *Server {
+// New creates a new server instance with configuration.
+// The custom endpoints have to come from endpoint.Parse, which validates them.
+func New(cfg *config.Config, endpoints ...endpoint.Endpoint) *Server {
 	// Create middleware manager
 	middlewareManager := middleware.NewManager(cfg)
 
@@ -31,6 +35,7 @@ func New(cfg *config.Config) *Server {
 		config:     *cfg,
 		middleware: middlewareManager,
 		handler:    h,
+		endpoints:  endpoints,
 	}
 
 	s.setupRoutes()
@@ -43,6 +48,11 @@ func (s *Server) setupRoutes() {
 
 	// Health check endpoints
 	mux.HandleFunc("/health", s.handler.Health)
+
+	// Custom endpoints take precedence over the catch-all handler
+	for _, e := range s.endpoints {
+		mux.Handle(e.Pattern, s.handler.Custom(e))
+	}
 
 	// Catch-all handler for logging all other requests
 	mux.HandleFunc("/", s.handler.Universal)
@@ -66,9 +76,19 @@ func (s *Server) setupRoutes() {
 func (s *Server) Start() error {
 	slog.Info("Starting HTTP logger server",
 		"address", s.server.Addr,
-		"config", s.config)
+		"config", s.config,
+		"endpoints", endpointSummary(s.endpoints))
 
 	return s.server.ListenAndServe()
+}
+
+// endpointSummary describes the custom endpoints without headers or bodies, which may hold secrets.
+func endpointSummary(endpoints []endpoint.Endpoint) []string {
+	summary := make([]string, 0, len(endpoints))
+	for _, e := range endpoints {
+		summary = append(summary, fmt.Sprintf("%s -> %d", e.Pattern, e.Status))
+	}
+	return summary
 }
 
 // Shutdown gracefully shuts down the server

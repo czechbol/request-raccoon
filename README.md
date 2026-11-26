@@ -73,6 +73,7 @@ go build -o request-raccoon cmd/http-logger/main.go
 | `MAX_LOGGED_BODY`     | `65536`    | Maximum request body bytes to log (capped at `10485760`)      |
 | `MAX_REQUEST_BODY`    | `33554432` | Maximum accepted request body size in bytes (`0` = no limit)  |
 | `READ_TIMEOUT`        | `60s`      | Time allowed to read a request, as a Go duration (`0` = none) |
+| `ENDPOINTS`           | none       | [Custom endpoints](#custom-endpoints), as a JSON array        |
 
 Request bodies larger than `MAX_LOGGED_BODY` are logged truncated (without splitting a UTF-8 character), with
 `request_body_truncated=true` and, when the `Content-Length` is known, `request_body_size`. With `0`, every non-empty
@@ -105,6 +106,50 @@ Rejected requests are logged like any other. How a read failure is reported and 
 
 The logged part is the first `MAX_LOGGED_BODY` bytes plus one. When reading it fails, `request_body` holds what was
 received, if anything. With `ENABLE_REQUEST_BODY=false`, every failure happens after the request line.
+
+### Custom endpoints
+
+`ENDPOINTS` makes matching requests receive your own status, headers and body. All other requests still get the default
+`200` response.
+
+```bash
+docker run -p 8080:8080 \
+  -e ENDPOINTS='[
+    {"pattern":"POST /webhook/github","status":202,"body":"accepted"},
+    {"pattern":"/fail","status":503,"body":"try later"}
+  ]' \
+  ghcr.io/czechbol/request-raccoon
+```
+
+In a Compose file, use a block value. Write a literal `$` as `$$`.
+
+```yaml
+environment:
+  ENDPOINTS: |
+    [
+      {
+        "pattern": "GET /users/{id}",
+        "status": 404,
+        "headers": {"Content-Type": "application/json"},
+        "body": "{\"error\": \"not found\"}"
+      }
+    ]
+```
+
+| Field     | Required | Default | Description                                                                 |
+| --------- | -------- | ------- | --------------------------------------------------------------------------- |
+| `pattern` | yes      |         | A Go [`ServeMux` pattern](https://pkg.go.dev/net/http#hdr-Patterns-ServeMux) |
+| `status`  | no       | `200`   | Response status, from 200 to 599                                            |
+| `headers` | no       | none    | Response headers, except `Content-Length` and `Transfer-Encoding`           |
+| `body`    | no       | empty   | Response body; not allowed with status 204 or 304                           |
+
+- A pattern without a method matches every method. `GET` patterns also match `HEAD`. A pattern ending in `/` matches
+  everything below it.
+- Without a `Content-Type` header, the type of a body is guessed from its content.
+- Requests are logged, and the [request limits](#request-limits) apply, as for any other path.
+- The server does not start if the value is invalid, if patterns conflict, or if an endpoint uses `/health` or `/`.
+  Use `/{$}` to match only the root path.
+- The startup log lists patterns and statuses, not headers or bodies.
 
 ## 💡 Usage
 
@@ -172,6 +217,17 @@ go mod tidy
 go test ./...
 go build -o request-raccoon cmd/http-logger/main.go
 ./request-raccoon
+```
+
+### 🧬 Mutation testing
+
+[Gremlins](https://gremlins.dev) changes the code and checks that the tests notice. CI runs it after the tests and
+fails when less than 90% of the tested changes are caught, or when too many runs time out. A change reported as `LIVED`
+was not caught. The script needs `jq`.
+
+```bash
+go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+./scripts/mutation-test.sh
 ```
 
 ### 📂 Project Structure

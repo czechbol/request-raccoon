@@ -8,6 +8,7 @@ on:
       - "go.mod"
       - "go.sum"
       - ".github/workflows/ci.yml"
+      - "scripts/**"
   pull_request:
     branches: [main]
 
@@ -82,9 +83,29 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: czechbol/request-raccoon
 
-  build:
+  mutation:
+    name: Mutation testing
     runs-on: ubuntu-latest
     needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Gremlins
+        run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
+
+      - name: Run mutation tests
+        run: ./scripts/mutation-test.sh
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, mutation]
     steps:
       - name: Checkout
         uses: actions/checkout@v7

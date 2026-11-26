@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/czechbol/request-raccoon/internal/config"
+	"github.com/czechbol/request-raccoon/internal/endpoint"
 )
 
 // declaredLength is the Content-Length announced by startUpload.
@@ -156,11 +157,11 @@ func TestServer_DisabledReadTimeout(t *testing.T) {
 }
 
 // startServer serves the application, including its server settings, on a loopback address.
-func startServer(t *testing.T, cfg *config.Config) *httptest.Server {
+func startServer(t *testing.T, cfg *config.Config, endpoints ...endpoint.Endpoint) *httptest.Server {
 	t.Helper()
 
 	ts := httptest.NewUnstartedServer(nil)
-	ts.Config = New(cfg).server
+	ts.Config = New(cfg, endpoints...).server
 	ts.Start()
 	t.Cleanup(ts.Close)
 	return ts

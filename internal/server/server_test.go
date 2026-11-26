@@ -39,6 +39,14 @@ func TestServer_SetupRoutes(t *testing.T) {
 	}
 }
 
+func TestServer_ReadHeaderTimeout(t *testing.T) {
+	server := New(&config.Config{})
+
+	if got, want := server.server.ReadHeaderTimeout, 10*time.Second; got != want {
+		t.Errorf("ReadHeaderTimeout = %v, want %v", got, want)
+	}
+}
+
 func TestServer_HealthEndpoint(t *testing.T) {
 	cfg := config.Config{
 		Port:              "8080",
