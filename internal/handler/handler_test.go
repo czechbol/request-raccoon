@@ -1,13 +1,41 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
+	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/czechbol/request-raccoon/internal/endpoint"
 )
+
+func TestHandler_Custom(t *testing.T) {
+	previous, output, flags := slog.Default(), log.Writer(), log.Flags()
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+		// slog.SetDefault also redirects the log package, which restoring the default does not undo.
+		log.SetOutput(output)
+		log.SetFlags(flags)
+	})
+	logs := &bytes.Buffer{}
+	slog.SetDefault(slog.New(slog.NewTextHandler(logs, nil)))
+
+	custom := New().Custom(endpoint.Endpoint{Pattern: "/hook", Status: http.StatusAccepted, Body: "accepted"})
+	rr := httptest.NewRecorder()
+	custom(rr, httptest.NewRequestWithContext(t.Context(), "POST", "/hook", strings.NewReader("x")))
+
+	if rr.Code != http.StatusAccepted || rr.Body.String() != "accepted" {
+		t.Errorf("got %d %q, want 202 %q", rr.Code, rr.Body.String(), "accepted")
+	}
+	if logs.Len() != 0 {
+		t.Errorf("Expected nothing to be logged, got %q", logs.String())
+	}
+}
 
 func TestHandler_Universal(t *testing.T) {
 	h := New()

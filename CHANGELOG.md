@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `ENDPOINTS` setting for custom endpoints that respond with a configured status, headers and body
+- Mutation testing with Gremlins in CI
 
 ## [1.1.0] - 2026-11-26
 

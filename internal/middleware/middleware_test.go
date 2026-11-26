@@ -509,6 +509,17 @@ func TestManager_Logging_BoundedBuffering(t *testing.T) {
 	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), "POST", "/test", source))
 }
 
+func TestManager_Logging_OmitsEmptyHeaders(t *testing.T) {
+	logs := captureLogs(t)
+	handler := NewManager(&config.Config{}).Logging(http.NotFoundHandler())
+
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil))
+
+	if headers, ok := requestLogEntry(t, logs)["headers"]; ok {
+		t.Errorf("Expected no headers field, got %v", headers)
+	}
+}
+
 // Helper types and functions for testing
 
 // captureLogs redirects the default logger to a buffer for the duration of the test.

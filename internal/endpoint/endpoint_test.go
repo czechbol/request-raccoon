@@ -43,6 +43,8 @@ func TestParse_Allowed(t *testing.T) {
 		`[{"pattern":"/a","status":204}]`,
 		`[{"pattern":"GET /a"},{"pattern":"POST /a"}]`,
 		`[{"pattern":"/a","status":599}]`,
+		// The first and last letters and digits allowed in a header name.
+		`[{"pattern":"/a","headers":{"az-AZ-09":"x"}}]`,
 	} {
 		if _, err := Parse(raw); err != nil {
 			t.Errorf("Parse(%s): %v", raw, err)
@@ -69,6 +71,7 @@ func TestParse_Invalid(t *testing.T) {
 		"body with 204":     {`[{"pattern":"/a","status":204,"body":"x"}]`, "body"},
 		"body with 304":     {`[{"pattern":"/a","status":304,"body":"x"}]`, "body"},
 		"header name":       {`[{"pattern":"/a","headers":{"Bad Name":"x"}}]`, "header"},
+		"header first rune": {`[{"pattern":"/a","headers":{" Bad":"x"}}]`, "header"},
 		"empty header name": {`[{"pattern":"/a","headers":{"":"x"}}]`, "header"},
 		"header value":      {`[{"pattern":"/a","headers":{"X-A":"a\r\nb"}}]`, "header"},
 		"content length":    {`[{"pattern":"/a","headers":{"content-length":"1"}}]`, "header"},
