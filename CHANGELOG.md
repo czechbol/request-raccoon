@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Go 1.27 is now required (built with 1.27.4)
+- Updated the GitHub Actions and gosec used by CI and releases
 - Request bodies over the limit are logged truncated instead of being omitted, and the limit is raised from 1024 bytes to 65536 bytes by default
 - **Requests that were previously accepted can now be rejected:** a request body over 32 MiB is answered with 413 Request Entity Too Large, and one that takes longer than 60 seconds to read with 408 Request Timeout, including on `/health`. Raise the limits or set them to `0` to disable them
 - Idle keep-alive connections are closed after `READ_TIMEOUT` (60 seconds by default)
