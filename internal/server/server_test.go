@@ -325,6 +325,7 @@ func TestServer_LargeUpload(t *testing.T) {
 
 	tests := []struct {
 		name              string
+		path              string
 		enableRequestBody bool
 		chunked           bool
 		wantBody          any
@@ -333,6 +334,7 @@ func TestServer_LargeUpload(t *testing.T) {
 	}{
 		{
 			name:              "known length",
+			path:              "/upload",
 			enableRequestBody: true,
 			wantBody:          strings.Repeat("a", limit),
 			wantTruncated:     true,
@@ -340,12 +342,22 @@ func TestServer_LargeUpload(t *testing.T) {
 		},
 		{
 			name:              "chunked",
+			path:              "/upload",
 			enableRequestBody: true,
 			chunked:           true,
 			wantBody:          strings.Repeat("a", limit),
 			wantTruncated:     true,
 		},
-		{name: "body logging disabled"},
+		{name: "body logging disabled", path: "/upload"},
+		{
+			name:              "health check",
+			path:              "/health",
+			enableRequestBody: true,
+			wantBody:          strings.Repeat("a", limit),
+			wantTruncated:     true,
+			wantSize:          float64(size),
+		},
+		{name: "health check with body logging disabled", path: "/health"},
 	}
 
 	for _, tt := range tests {
@@ -370,7 +382,7 @@ func TestServer_LargeUpload(t *testing.T) {
 				// Hiding the concrete type leaves the length unknown to the client.
 				upload = io.MultiReader(upload)
 			}
-			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, ts.URL+"/upload", upload)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, ts.URL+tt.path, upload)
 			if err != nil {
 				t.Fatalf("Failed to create request: %v", err)
 			}

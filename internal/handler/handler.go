@@ -18,11 +18,7 @@ func New() *Handler {
 
 // Universal responds with 200 OK to all requests.
 func (h *Handler) Universal(w http.ResponseWriter, r *http.Request) {
-	// Receive the whole body first: net/http cuts off large unread uploads once the response is sent.
-	if r.Body != nil {
-		// Read failures do not change the response.
-		_, _ = io.Copy(io.Discard, r.Body)
-	}
+	drainBody(r)
 
 	response := map[string]interface{}{
 		"status":    "success",
@@ -43,7 +39,9 @@ func (h *Handler) Universal(w http.ResponseWriter, r *http.Request) {
 }
 
 // Health provides health check endpoint.
-func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
+	drainBody(r)
+
 	health := map[string]interface{}{
 		"status":    "healthy",
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
@@ -56,5 +54,14 @@ func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
 		slog.Error("Failed to encode response", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+}
+
+// drainBody receives the whole request body. It has to happen before responding,
+// because net/http cuts off large unread uploads once the response is sent.
+func drainBody(r *http.Request) {
+	if r.Body != nil {
+		// Read failures do not change the response.
+		_, _ = io.Copy(io.Discard, r.Body)
 	}
 }
