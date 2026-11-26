@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-27
+
 ### Added
 
 - `ENDPOINTS` setting for custom endpoints that respond with a configured status, headers and body
@@ -57,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 📖 Complete documentation with usage examples
 - 📄 MIT License
 
-[Unreleased]: https://github.com/czechbol/request-raccoon/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/czechbol/request-raccoon/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/czechbol/request-raccoon/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/czechbol/request-raccoon/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/czechbol/request-raccoon/releases/tag/v1.0.0
