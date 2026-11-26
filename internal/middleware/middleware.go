@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/czechbol/request-raccoon/internal/bodyerror"
 	"github.com/czechbol/request-raccoon/internal/config"
 )
 
@@ -62,7 +63,8 @@ func (m *Manager) Logging(next http.Handler) http.Handler {
 		slog.Info("HTTP request received", logFields...)
 
 		if bodyErr != nil {
-			http.Error(w, "Bad Request", http.StatusBadRequest)
+			status := bodyerror.Status(bodyErr)
+			http.Error(w, http.StatusText(status), status)
 			return
 		}
 

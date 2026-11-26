@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/czechbol/request-raccoon/internal/bodyerror"
 )
 
 // Handler contains the HTTP handlers.
@@ -16,9 +18,11 @@ func New() *Handler {
 	return &Handler{}
 }
 
-// Universal responds with 200 OK to all requests.
+// Universal responds with 200 OK to all requests whose body is not rejected.
 func (h *Handler) Universal(w http.ResponseWriter, r *http.Request) {
-	drainBody(r)
+	if !drainBody(w, r) {
+		return
+	}
 
 	response := map[string]interface{}{
 		"status":    "success",
@@ -40,7 +44,9 @@ func (h *Handler) Universal(w http.ResponseWriter, r *http.Request) {
 
 // Health provides health check endpoint.
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
-	drainBody(r)
+	if !drainBody(w, r) {
+		return
+	}
 
 	health := map[string]interface{}{
 		"status":    "healthy",
@@ -59,12 +65,22 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 
 // drainBody receives the whole request body. It has to happen before responding,
 // because net/http cuts off large unread uploads once the response is sent.
-func drainBody(r *http.Request) {
+// It reports false after rejecting a body that is too large or too slow.
+func drainBody(w http.ResponseWriter, r *http.Request) bool {
 	if r.Body == nil {
-		return
+		return true
 	}
-	// Read failures do not change the response.
-	if _, err := io.Copy(io.Discard, r.Body); err != nil {
-		slog.Warn("Failed to read request body", "path", r.URL.Path, "error", err)
+	_, err := io.Copy(io.Discard, r.Body)
+	if err == nil {
+		return true
 	}
+	slog.Warn("Failed to read request body", "path", r.URL.Path, "error", err)
+
+	// Other read failures do not change the response.
+	status := bodyerror.Status(err)
+	if status == http.StatusBadRequest {
+		return true
+	}
+	http.Error(w, http.StatusText(status), status)
+	return false
 }

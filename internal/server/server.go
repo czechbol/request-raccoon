@@ -49,11 +49,16 @@ func (s *Server) setupRoutes() {
 
 	// Apply middleware in the correct order
 	finalHandler := s.middleware.Logging(mux)
+	// MaxBytesHandler treats 0 as an empty body limit, not as no limit.
+	if s.config.MaxRequestBody > 0 {
+		finalHandler = http.MaxBytesHandler(finalHandler, s.config.MaxRequestBody)
+	}
 
 	s.server = &http.Server{
 		Addr:              s.config.Host + ":" + s.config.Port,
 		Handler:           finalHandler,
 		ReadHeaderTimeout: 10 * time.Second, // Set a read header timeout
+		ReadTimeout:       s.config.ReadTimeout,
 	}
 }
 
