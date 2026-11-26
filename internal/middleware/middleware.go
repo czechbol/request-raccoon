@@ -35,15 +35,14 @@ func (m *Manager) Logging(next http.Handler) http.Handler {
 		}
 
 		// Add request body if enabled
+		var bodyErr error
 		if m.config.EnableRequestBody && r.Body != nil {
-			bodyFields, err := m.peekBody(r)
-			if err != nil {
-				slog.Error("Failed to read request body",
-					"error", err)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-				return
-			}
+			var bodyFields []any
+			bodyFields, bodyErr = m.peekBody(r)
 			logFields = append(logFields, bodyFields...)
+			if bodyErr != nil {
+				logFields = append(logFields, "request_body_error", bodyErr.Error())
+			}
 		}
 
 		// Add all headers (except sensitive ones)
@@ -62,32 +61,36 @@ func (m *Manager) Logging(next http.Handler) http.Handler {
 		// Log with appropriate level based on status code
 		slog.Info("HTTP request received", logFields...)
 
+		if bodyErr != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+
 		// Call the next handler
 		next.ServeHTTP(w, r)
 	})
 }
 
 // peekBody reads just enough of the request body to log it, restores the body
-// for downstream handlers and returns the log fields describing it.
+// for downstream handlers and returns the log fields describing it. If reading
+// fails, the fields describe the partial body and the body is not restored.
 func (m *Manager) peekBody(r *http.Request) ([]any, error) {
 	limit := m.config.MaxLoggedBody
 
 	// The one byte past the limit tells whether the body has to be truncated.
 	prefix, err := io.ReadAll(io.LimitReader(r.Body, int64(limit)+1))
-	if err != nil {
-		return nil, err
+	if err == nil {
+		r.Body = struct {
+			io.Reader
+			io.Closer
+		}{io.MultiReader(bytes.NewReader(prefix), r.Body), r.Body}
 	}
-
-	r.Body = struct {
-		io.Reader
-		io.Closer
-	}{io.MultiReader(bytes.NewReader(prefix), r.Body), r.Body}
 
 	switch {
 	case len(prefix) == 0:
-		return nil, nil
+		return nil, err
 	case len(prefix) <= limit:
-		return []any{"request_body", string(prefix)}, nil
+		return []any{"request_body", string(prefix)}, err
 	}
 
 	fields := []any{
@@ -98,7 +101,7 @@ func (m *Manager) peekBody(r *http.Request) ([]any, error) {
 	if r.ContentLength > 0 {
 		fields = append(fields, "request_body_size", r.ContentLength)
 	}
-	return fields, nil
+	return fields, err
 }
 
 // Utility functions

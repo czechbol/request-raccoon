@@ -8,8 +8,10 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/czechbol/request-raccoon/internal/config"
 )
@@ -189,33 +191,62 @@ func TestManager_Logging_NilBody(t *testing.T) {
 }
 
 func TestManager_Logging_BodyReadError(t *testing.T) {
-	cfg := config.Config{
-		EnableRequestBody: true,
-	}
-	manager := NewManager(cfg)
-
-	var handlerCalled bool
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handlerCalled = true
-		w.WriteHeader(http.StatusOK)
-	})
-
-	handler := manager.Logging(nextHandler)
-
-	// Create a reader that always returns an error
-	errorReader := &errorReader{}
-	req := httptest.NewRequest("POST", "/test", errorReader)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	// Handler should not be called due to error
-	if handlerCalled {
-		t.Error("Next handler should not have been called due to body read error")
+	tests := []struct {
+		name     string
+		received string
+		// wantBody is nil when no request_body field is expected.
+		wantBody      any
+		wantTruncated any
+	}{
+		{name: "nothing received"},
+		{name: "partial body", received: "partial", wantBody: "partial"},
+		{name: "partial body at limit", received: "12345678", wantBody: "12345678"},
+		{
+			name: "partial body over limit", received: "123456789",
+			wantBody: "12345678", wantTruncated: true,
+		},
 	}
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Errorf("Expected status 500, got %d", rr.Code)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logs := captureLogs(t)
+			manager := NewManager(config.Config{EnableRequestBody: true, MaxLoggedBody: 8})
+
+			handler := manager.Logging(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Error("Next handler should not have been called due to body read error")
+			}))
+
+			// DataErrReader reports the error together with the last bytes of data.
+			source := iotest.DataErrReader(io.MultiReader(strings.NewReader(tt.received), &errorReader{}))
+			req := httptest.NewRequestWithContext(t.Context(), "POST", "/test", source)
+			req.Header.Set("User-Agent", "test-agent")
+			req.Header.Set("Authorization", "Bearer secret")
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusBadRequest {
+				t.Errorf("Expected status 400, got %d", rr.Code)
+			}
+
+			entry := requestLogEntry(t, logs)
+			want := map[string]any{
+				"method":                 "POST",
+				"path":                   "/test",
+				"request_body":           tt.wantBody,
+				"request_body_truncated": tt.wantTruncated,
+				"request_body_error":     io.ErrUnexpectedEOF.Error(),
+			}
+			for field, value := range want {
+				if got := entry[field]; got != value {
+					t.Errorf("%s: expected %#v, got %#v", field, value, got)
+				}
+			}
+			wantHeaders := map[string]any{"User-Agent": "test-agent", "Authorization": "[REDACTED]"}
+			if got := entry["headers"]; !reflect.DeepEqual(got, wantHeaders) {
+				t.Errorf("headers: expected %#v, got %#v", wantHeaders, got)
+			}
+		})
 	}
 }
 

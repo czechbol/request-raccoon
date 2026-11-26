@@ -15,10 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Request bodies over the limit are logged truncated instead of being omitted, and the limit is raised from 1024 bytes to 65536 bytes by default
+- A request body that cannot be read is answered with 400 Bad Request instead of 500 Internal Server Error
 
 ### Fixed
 
 - Memory used for request body logging no longer grows with the size of the body
+- Requests whose body cannot be read are still logged, with the partial body and a `request_body_error` field
 
 ## [1.0.0] - 2025-06-05
 
