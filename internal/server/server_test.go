@@ -25,7 +25,7 @@ func TestServer_SetupRoutes(t *testing.T) {
 		EnableRequestBody: true,
 	}
 
-	server := New(cfg)
+	server := New(&cfg)
 
 	// Test that server address is correctly set
 	expectedAddr := cfg.Host + ":" + cfg.Port
@@ -47,7 +47,7 @@ func TestServer_HealthEndpoint(t *testing.T) {
 		EnableRequestBody: false,
 	}
 
-	server := New(cfg)
+	server := New(&cfg)
 
 	// Create a test request for the health endpoint
 	req := httptest.NewRequest("GET", "/health", nil)
@@ -81,7 +81,7 @@ func TestServer_UniversalEndpoint(t *testing.T) {
 		EnableRequestBody: false,
 	}
 
-	server := New(cfg)
+	server := New(&cfg)
 
 	tests := []struct {
 		name   string
@@ -144,7 +144,7 @@ func TestServer_MiddlewareIntegration(t *testing.T) {
 		EnableRequestBody: true,
 	}
 
-	server := New(cfg)
+	server := New(&cfg)
 
 	// Test with a request that has a body
 	req := httptest.NewRequest("POST", "/test", nil)
@@ -187,7 +187,7 @@ func TestServer_ConfigIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := New(tt.config)
+			server := New(&tt.config)
 
 			expectedAddr := tt.config.Host + ":" + tt.config.Port
 			if server.server.Addr != expectedAddr {
@@ -213,7 +213,7 @@ func TestServer_Shutdown(t *testing.T) {
 		EnableRequestBody: false,
 	}
 
-	server := New(cfg)
+	server := New(&cfg)
 
 	// Start server in a goroutine
 	errChan := make(chan error, 1)
@@ -253,7 +253,7 @@ func TestServer_ShutdownTimeout(t *testing.T) {
 		EnableRequestBody: false,
 	}
 
-	server := New(cfg)
+	server := New(&cfg)
 
 	// Start server in a goroutine
 	errChan := make(chan error, 1)
@@ -297,7 +297,7 @@ func TestServer_HandlerChain(t *testing.T) {
 		EnableRequestBody: true,
 	}
 
-	server := New(cfg)
+	server := New(&cfg)
 
 	// Test that middleware is properly chained with handlers
 	req := httptest.NewRequest("GET", "/health", nil)
@@ -366,7 +366,7 @@ func TestServer_LargeUpload(t *testing.T) {
 			var logs bytes.Buffer
 			captureLogs(t, &logs)
 
-			app := New(config.Config{EnableRequestBody: tt.enableRequestBody, MaxLoggedBody: limit}).server.Handler
+			app := New(&config.Config{EnableRequestBody: tt.enableRequestBody, MaxLoggedBody: limit}).server.Handler
 
 			// Count what the application itself reads; net/http discards only a little after it returns.
 			received := make(chan int, 1)
@@ -435,7 +435,7 @@ func TestServer_BodyReadErrorAfterRequestLog(t *testing.T) {
 			var logs bytes.Buffer
 			captureLogs(t, &logs)
 
-			app := New(config.Config{EnableRequestBody: tt.enableRequestBody, MaxLoggedBody: 4}).server.Handler
+			app := New(&config.Config{EnableRequestBody: tt.enableRequestBody, MaxLoggedBody: 4}).server.Handler
 
 			// The failure comes after more bytes than the middleware reads for the request log.
 			body := io.MultiReader(strings.NewReader("abcdefgh"), iotest.ErrReader(io.ErrUnexpectedEOF))
@@ -514,7 +514,7 @@ func TestServer_RouteSpecificity(t *testing.T) {
 		EnableRequestBody: false,
 	}
 
-	server := New(cfg)
+	server := New(&cfg)
 
 	// Test that /health is handled by health handler, not universal
 	healthReq := httptest.NewRequest("GET", "/health", nil)

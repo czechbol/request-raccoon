@@ -20,7 +20,7 @@ type Server struct {
 }
 
 // New creates a new server instance with configuration
-func New(cfg config.Config) *Server {
+func New(cfg *config.Config) *Server {
 	// Create middleware manager
 	middlewareManager := middleware.NewManager(cfg)
 
@@ -28,7 +28,7 @@ func New(cfg config.Config) *Server {
 	h := handler.New()
 
 	s := &Server{
-		config:     cfg,
+		config:     *cfg,
 		middleware: middlewareManager,
 		handler:    h,
 	}

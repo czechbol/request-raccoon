@@ -17,9 +17,9 @@ type Manager struct {
 }
 
 // NewManager creates a new middleware manager
-func NewManager(cfg config.Config) *Manager {
+func NewManager(cfg *config.Config) *Manager {
 	return &Manager{
-		config: cfg,
+		config: *cfg,
 	}
 }
 

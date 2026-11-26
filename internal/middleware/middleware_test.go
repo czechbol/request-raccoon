@@ -78,7 +78,7 @@ func TestManager_Logging(t *testing.T) {
 			cfg := config.Config{
 				EnableRequestBody: tt.enableRequestBody,
 			}
-			manager := NewManager(cfg)
+			manager := NewManager(&cfg)
 
 			// Create a test handler that records if it was called
 			var handlerCalled bool
@@ -135,7 +135,7 @@ func TestManager_Logging_LargeBody(t *testing.T) {
 	cfg := config.Config{
 		EnableRequestBody: true,
 	}
-	manager := NewManager(cfg)
+	manager := NewManager(&cfg)
 
 	// Create a large body (over 1024 bytes)
 	largeBody := strings.Repeat("a", 1500)
@@ -167,7 +167,7 @@ func TestManager_Logging_NilBody(t *testing.T) {
 	cfg := config.Config{
 		EnableRequestBody: true,
 	}
-	manager := NewManager(cfg)
+	manager := NewManager(&cfg)
 
 	var handlerCalled bool
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -210,7 +210,7 @@ func TestManager_Logging_BodyReadError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logs := captureLogs(t)
-			manager := NewManager(config.Config{EnableRequestBody: true, MaxLoggedBody: 8})
+			manager := NewManager(&config.Config{EnableRequestBody: true, MaxLoggedBody: 8})
 
 			handler := manager.Logging(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				t.Error("Next handler should not have been called due to body read error")
@@ -306,7 +306,7 @@ func TestManager_Logging_HeaderFiltering(t *testing.T) {
 	cfg := config.Config{
 		EnableRequestBody: false,
 	}
-	manager := NewManager(cfg)
+	manager := NewManager(&cfg)
 
 	var handlerCalled bool
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -339,7 +339,7 @@ func TestManager_Logging_EmptyHeaders(t *testing.T) {
 	cfg := config.Config{
 		EnableRequestBody: false,
 	}
-	manager := NewManager(cfg)
+	manager := NewManager(&cfg)
 
 	var handlerCalled bool
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -424,7 +424,7 @@ func TestManager_Logging_BodyLimit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logs := captureLogs(t)
-			manager := NewManager(config.Config{EnableRequestBody: true, MaxLoggedBody: tt.limit})
+			manager := NewManager(&config.Config{EnableRequestBody: true, MaxLoggedBody: tt.limit})
 
 			var received []byte
 			handler := manager.Logging(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
@@ -464,7 +464,7 @@ func TestManager_Logging_BodyLimit(t *testing.T) {
 
 func TestManager_Logging_BodyDisabled(t *testing.T) {
 	logs := captureLogs(t)
-	manager := NewManager(config.Config{EnableRequestBody: false, MaxLoggedBody: 4})
+	manager := NewManager(&config.Config{EnableRequestBody: false, MaxLoggedBody: 4})
 
 	source := &countingReader{reader: strings.NewReader("abcdefgh")}
 	handler := manager.Logging(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
@@ -486,7 +486,7 @@ func TestManager_Logging_BoundedBuffering(t *testing.T) {
 	const limit = 1000
 
 	logs := captureLogs(t)
-	manager := NewManager(config.Config{EnableRequestBody: true, MaxLoggedBody: limit})
+	manager := NewManager(&config.Config{EnableRequestBody: true, MaxLoggedBody: limit})
 	body := strings.Repeat("abcdefgh", 1<<17) // 1 MiB
 	source := &countingReader{reader: strings.NewReader(body)}
 
@@ -563,7 +563,7 @@ func TestManager_Logging_MultipleHeaderValues(t *testing.T) {
 	cfg := config.Config{
 		EnableRequestBody: false,
 	}
-	manager := NewManager(cfg)
+	manager := NewManager(&cfg)
 
 	var handlerCalled bool
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
