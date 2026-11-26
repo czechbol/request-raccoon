@@ -221,14 +221,13 @@ go build -o request-raccoon cmd/http-logger/main.go
 
 ### 🧬 Mutation testing
 
-[Gremlins](https://gremlins.dev) changes the code and checks that the tests notice. CI fails when less than 90% of the
-tested changes are caught. A change reported as `LIVED` was not caught.
+[Gremlins](https://gremlins.dev) changes the code and checks that the tests notice. CI runs it after the tests and
+fails when less than 90% of the tested changes are caught, or when too many runs time out. A change reported as `LIVED`
+was not caught. The script needs `jq`.
 
 ```bash
 go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
-gremlins unleash --integration --coverpkg ./... --timeout-coefficient 5 \
-  --invert-assignments --invert-logical --invert-loopctrl \
-  --invert-bitwise --invert-bwassign --remove-self-assignments
+./scripts/mutation-test.sh
 ```
 
 ### 📂 Project Structure

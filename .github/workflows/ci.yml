@@ -8,6 +8,7 @@ on:
       - "go.mod"
       - "go.sum"
       - ".github/workflows/ci.yml"
+      - "scripts/**"
   pull_request:
     branches: [main]
 
@@ -99,19 +100,12 @@ jobs:
       - name: Install Gremlins
         run: go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.6.0
 
-      # --integration and --coverpkg let the tests of one package catch mutants in another.
-      - name: Run Gremlins
-        run: >-
-          gremlins unleash
-          --integration --coverpkg ./...
-          --timeout-coefficient 5
-          --invert-assignments --invert-logical --invert-loopctrl
-          --invert-bitwise --invert-bwassign --remove-self-assignments
-          --threshold-efficacy 90
+      - name: Run mutation tests
+        run: ./scripts/mutation-test.sh
 
   build:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, mutation]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
