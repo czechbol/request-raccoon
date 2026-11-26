@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://golang.org">
-    <img src="https://img.shields.io/badge/Go-1.24+-blue?style=for-the-badge" alt="Go Version">
+    <img src="https://img.shields.io/badge/Go-1.27+-blue?style=for-the-badge" alt="Go Version">
   </a>
   <a href="https://github.com/czechbol/request-raccoon/actions">
     <img src="https://img.shields.io/github/actions/workflow/status/czechbol/request-raccoon/ci.yml?branch=main&style=for-the-badge" alt="Build Status">
@@ -160,7 +160,7 @@ Sensitive headers are automatically redacted 🙈
 
 ### 📋 Prerequisites
 
-- Go 1.24+ 🐹
+- Go 1.27+ 🐹
 - Docker (optional) 🐳
 
 ### 🛠️ Setup
