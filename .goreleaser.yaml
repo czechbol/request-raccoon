@@ -79,12 +79,14 @@ snapshot:
 changelog:
   disable: true
 
+# Pre-releases publish only their own version tag: the stable tags are left empty (and ignored)
+# for them, and the stable manifests are not pushed.
 dockers:
   - image_templates:
       - "ghcr.io/czechbol/request-raccoon:{{ .Tag }}-amd64"
-      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-amd64"
-      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-amd64"
-      - "ghcr.io/czechbol/request-raccoon:latest-amd64"
+      - "{{ if not .Prerelease }}ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-amd64{{ end }}"
+      - "{{ if not .Prerelease }}ghcr.io/czechbol/request-raccoon:v{{ .Major }}-amd64{{ end }}"
+      - "{{ if not .Prerelease }}ghcr.io/czechbol/request-raccoon:latest-amd64{{ end }}"
     dockerfile: Dockerfile
     use: buildx
     build_flag_templates:
@@ -99,9 +101,9 @@ dockers:
 
   - image_templates:
       - "ghcr.io/czechbol/request-raccoon:{{ .Tag }}-arm64v8"
-      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-arm64v8"
-      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-arm64v8"
-      - "ghcr.io/czechbol/request-raccoon:latest-arm64v8"
+      - "{{ if not .Prerelease }}ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-arm64v8{{ end }}"
+      - "{{ if not .Prerelease }}ghcr.io/czechbol/request-raccoon:v{{ .Major }}-arm64v8{{ end }}"
+      - "{{ if not .Prerelease }}ghcr.io/czechbol/request-raccoon:latest-arm64v8{{ end }}"
     dockerfile: Dockerfile
     use: buildx
     build_flag_templates:
@@ -116,9 +118,9 @@ dockers:
 
   - image_templates:
       - "ghcr.io/czechbol/request-raccoon:{{ .Tag }}-armv7"
-      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-armv7"
-      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-armv7"
-      - "ghcr.io/czechbol/request-raccoon:latest-armv7"
+      - "{{ if not .Prerelease }}ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-armv7{{ end }}"
+      - "{{ if not .Prerelease }}ghcr.io/czechbol/request-raccoon:v{{ .Major }}-armv7{{ end }}"
+      - "{{ if not .Prerelease }}ghcr.io/czechbol/request-raccoon:latest-armv7{{ end }}"
     dockerfile: Dockerfile
     use: buildx
     build_flag_templates:
@@ -134,9 +136,9 @@ dockers:
 
   - image_templates:
       - "ghcr.io/czechbol/request-raccoon:{{ .Tag }}-armv6"
-      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-armv6"
-      - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-armv6"
-      - "ghcr.io/czechbol/request-raccoon:latest-armv6"
+      - "{{ if not .Prerelease }}ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-armv6{{ end }}"
+      - "{{ if not .Prerelease }}ghcr.io/czechbol/request-raccoon:v{{ .Major }}-armv6{{ end }}"
+      - "{{ if not .Prerelease }}ghcr.io/czechbol/request-raccoon:latest-armv6{{ end }}"
     dockerfile: Dockerfile
     use: buildx
     build_flag_templates:
@@ -159,6 +161,7 @@ docker_manifests:
       - "ghcr.io/czechbol/request-raccoon:{{ .Tag }}-armv6"
 
   - name_template: "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}"
+    skip_push: auto
     image_templates:
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-amd64"
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-arm64v8"
@@ -166,6 +169,7 @@ docker_manifests:
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}.{{ .Minor }}-armv6"
 
   - name_template: "ghcr.io/czechbol/request-raccoon:v{{ .Major }}"
+    skip_push: auto
     image_templates:
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-amd64"
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-arm64v8"
@@ -173,6 +177,7 @@ docker_manifests:
       - "ghcr.io/czechbol/request-raccoon:v{{ .Major }}-armv6"
 
   - name_template: "ghcr.io/czechbol/request-raccoon:latest"
+    skip_push: auto
     image_templates:
       - "ghcr.io/czechbol/request-raccoon:latest-amd64"
       - "ghcr.io/czechbol/request-raccoon:latest-arm64v8"
