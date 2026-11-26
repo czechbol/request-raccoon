@@ -106,7 +106,7 @@ func TestManager_Logging(t *testing.T) {
 				url += "?" + tt.query
 			}
 
-			req := httptest.NewRequest(tt.method, url, body)
+			req := httptest.NewRequestWithContext(t.Context(), tt.method, url, body)
 
 			// Add headers
 			for k, v := range tt.headers {
@@ -153,7 +153,7 @@ func TestManager_Logging_LargeBody(t *testing.T) {
 	})
 
 	handler := manager.Logging(nextHandler)
-	req := httptest.NewRequest("POST", "/test", strings.NewReader(largeBody))
+	req := httptest.NewRequestWithContext(t.Context(), "POST", "/test", strings.NewReader(largeBody))
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -176,7 +176,7 @@ func TestManager_Logging_NilBody(t *testing.T) {
 	})
 
 	handler := manager.Logging(nextHandler)
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -315,7 +315,7 @@ func TestManager_Logging_HeaderFiltering(t *testing.T) {
 	})
 
 	handler := manager.Logging(nextHandler)
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil)
 
 	// Add both sensitive and non-sensitive headers
 	req.Header.Set("Authorization", "Bearer secret")
@@ -348,7 +348,7 @@ func TestManager_Logging_EmptyHeaders(t *testing.T) {
 	})
 
 	handler := manager.Logging(nextHandler)
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil)
 	// Don't add any headers
 
 	rr := httptest.NewRecorder()
@@ -572,7 +572,7 @@ func TestManager_Logging_MultipleHeaderValues(t *testing.T) {
 	})
 
 	handler := manager.Logging(nextHandler)
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequestWithContext(t.Context(), "GET", "/test", nil)
 
 	// Add header with multiple values
 	req.Header.Add("Accept", "application/json")

@@ -50,7 +50,7 @@ func TestServer_HealthEndpoint(t *testing.T) {
 	server := New(&cfg)
 
 	// Create a test request for the health endpoint
-	req := httptest.NewRequest("GET", "/health", nil)
+	req := httptest.NewRequestWithContext(t.Context(), "GET", "/health", nil)
 	rr := httptest.NewRecorder()
 
 	// Serve the request
@@ -112,7 +112,7 @@ func TestServer_UniversalEndpoint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.path, nil)
+			req := httptest.NewRequestWithContext(t.Context(), tt.method, tt.path, nil)
 			rr := httptest.NewRecorder()
 
 			server.server.Handler.ServeHTTP(rr, req)
@@ -147,7 +147,7 @@ func TestServer_MiddlewareIntegration(t *testing.T) {
 	server := New(&cfg)
 
 	// Test with a request that has a body
-	req := httptest.NewRequest("POST", "/test", nil)
+	req := httptest.NewRequestWithContext(t.Context(), "POST", "/test", nil)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "test-agent")
 
@@ -300,7 +300,7 @@ func TestServer_HandlerChain(t *testing.T) {
 	server := New(&cfg)
 
 	// Test that middleware is properly chained with handlers
-	req := httptest.NewRequest("GET", "/health", nil)
+	req := httptest.NewRequestWithContext(t.Context(), "GET", "/health", nil)
 	rr := httptest.NewRecorder()
 
 	server.server.Handler.ServeHTTP(rr, req)
@@ -517,12 +517,12 @@ func TestServer_RouteSpecificity(t *testing.T) {
 	server := New(&cfg)
 
 	// Test that /health is handled by health handler, not universal
-	healthReq := httptest.NewRequest("GET", "/health", nil)
+	healthReq := httptest.NewRequestWithContext(t.Context(), "GET", "/health", nil)
 	healthRr := httptest.NewRecorder()
 	server.server.Handler.ServeHTTP(healthRr, healthReq)
 
 	// Test that other paths are handled by universal handler
-	universalReq := httptest.NewRequest("GET", "/anything", nil)
+	universalReq := httptest.NewRequestWithContext(t.Context(), "GET", "/anything", nil)
 	universalRr := httptest.NewRecorder()
 	server.server.Handler.ServeHTTP(universalRr, universalReq)
 
