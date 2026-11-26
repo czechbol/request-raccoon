@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/czechbol/request-raccoon/internal/bodyerror"
+	"github.com/czechbol/request-raccoon/internal/endpoint"
 )
 
 // Handler contains the HTTP handlers.
@@ -60,6 +61,26 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Failed to encode response", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+}
+
+// Custom responds as the endpoint defines to all requests whose body is not rejected.
+func (h *Handler) Custom(e endpoint.Endpoint) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !drainBody(w, r) {
+			return
+		}
+
+		for name, value := range e.Headers {
+			w.Header().Set(name, value)
+		}
+		w.WriteHeader(e.Status)
+		if e.Body == "" {
+			return
+		}
+		if _, err := io.WriteString(w, e.Body); err != nil {
+			slog.Error("Failed to write response", "error", err)
+		}
 	}
 }
 

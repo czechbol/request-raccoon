@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/czechbol/request-raccoon/internal/config"
+	"github.com/czechbol/request-raccoon/internal/endpoint"
 	"github.com/czechbol/request-raccoon/internal/server"
 )
 
@@ -30,8 +31,14 @@ func main() {
 	logger := slog.New(handler)
 	slog.SetDefault(logger)
 
+	endpoints, err := endpoint.Parse(os.Getenv("ENDPOINTS"))
+	if err != nil {
+		slog.Error("Invalid ENDPOINTS", "error", err)
+		os.Exit(1)
+	}
+
 	// Create server
-	srv := server.New(&cfg)
+	srv := server.New(&cfg, endpoints...)
 
 	// Set up graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())

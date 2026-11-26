@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `ENDPOINTS` setting for custom endpoints that respond with a configured status, headers and body
+
 ## [1.1.0] - 2026-11-26
 
 ### Added
