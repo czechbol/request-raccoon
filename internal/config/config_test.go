@@ -66,6 +66,36 @@ func TestLoad(t *testing.T) {
 	})
 }
 
+func TestLoad_MaxLoggedBody(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		expected int
+	}{
+		{name: "unset or empty uses default", envValue: "", expected: 65536},
+		{name: "custom value", envValue: "2048", expected: 2048},
+		{name: "zero", envValue: "0", expected: 0},
+		{name: "exactly the cap", envValue: "10485760", expected: 10485760},
+		{name: "above the cap is clamped", envValue: "10485761", expected: 10485760},
+		{name: "beyond integer range is clamped", envValue: "99999999999999999999", expected: 10485760},
+		{name: "negative uses default", envValue: "-1", expected: 65536},
+		{name: "negative beyond integer range uses default", envValue: "-99999999999999999999", expected: 65536},
+		{name: "non-numeric uses default", envValue: "lots", expected: 65536},
+		{name: "unit suffix uses default", envValue: "64k", expected: 65536},
+		{name: "fraction uses default", envValue: "1.5", expected: 65536},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("MAX_LOGGED_BODY", tt.envValue)
+
+			if got := Load().MaxLoggedBody; got != tt.expected {
+				t.Errorf("MAX_LOGGED_BODY=%q: expected %d, got %d", tt.envValue, tt.expected, got)
+			}
+		})
+	}
+}
+
 func TestGetEnv(t *testing.T) {
 	tests := []struct {
 		name         string
