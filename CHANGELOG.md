@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-26
+
 ### Added
 
 - `MAX_LOGGED_BODY` setting for the maximum number of request body bytes to log (default 65536, capped at 10 MiB)
@@ -50,5 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 📖 Complete documentation with usage examples
 - 📄 MIT License
 
-[Unreleased]: https://github.com/czechbol/request-raccoon/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/czechbol/request-raccoon/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/czechbol/request-raccoon/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/czechbol/request-raccoon/releases/tag/v1.0.0
